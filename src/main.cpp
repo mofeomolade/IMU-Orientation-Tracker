@@ -5,6 +5,7 @@
 #define SCL 7
 #define main_register 0x68 //MPU 6050 SIGNAL_PATH_RESET register
 #define wake_register 0x6B //PWR_MGMT_1 register
+#define sensor_start_register 0x3B //ACCEL_XOUT_H register. All other ACCEL + GYRO registers follw immediately after
 
 // put function declarations here:
 int write_byte(uint8_t dev_address, uint8_t reg_address, const uint8_t *data); //Write a single byte to peripheral register
@@ -21,6 +22,15 @@ void setup() {
 }
 
 void loop() {
+  
+  uint8_t IMU_buffer[14];
+  
+  if (read_burst(main_register, sensor_start_register, 14, IMU_buffer) == 0){
+    for(size_t i = 0; i < 14; i++){
+      
+    }
+  }
+
 
 }
 
@@ -65,11 +75,14 @@ int read_burst(uint8_t dev_address, uint8_t reg_address, size_t length, uint8_t 
   Wire.beginTransmission(dev_address);
   Wire.write(reg_address);
   
-  //Check that Wire.endTransmission is successful i.e. returns 0
-  if (Wire.endTransmission() != 0) return -1; //Transmission error
+  if (Wire.endTransmission() != 0){ //Check that Wire.endTransmission is successful i.e. returns 0
+    return -1 //Transmission error
+  }
 
   size_t bytes_received = Wire.requestFrom(dev_address, length);
-  if(bytes_received != length) return -2; //Length mismatch error
+  if(bytes_received != length){ //Check that the bytes available on I2C bus match the reqested burst length
+    return -2 //Length mismatch error
+  }
 
   //Loop through wire read 
   for(size_t i = 0; i < length, i++){
@@ -77,6 +90,6 @@ int read_burst(uint8_t dev_address, uint8_t reg_address, size_t length, uint8_t 
       buffer[i] = Wire.read();
     }
   }
-  
+
   return 0; //Successful read
 }
