@@ -8,9 +8,9 @@
 
 // put function declarations here:
 int write_byte(uint8_t dev_address, uint8_t reg_address, const uint8_t *data); //Write a single byte to peripheral register
-int write_burst(uint8_t dev_address, uint8_t start_reg_address, const uint8_t *data[], size_t length); //Write a specified number of bytes to multiple adjaescent peripheral registers
-int read_byte(uint8_t dev_address, uint8_t reg_address); //Read a byte from single peripheral register
-int read_burst(uint8_t dev_address, uint8_t start_reg_address, size_t length); //Read a specified number of bytes from multiple adjaescent peripheral registers
+int write_burst(uint8_t dev_address, uint8_t reg_address, const uint8_t *data, size_t length); //Write a specified number of bytes to multiple adjaescent peripheral registers
+int read_byte(uint8_t dev_address, uint8_t reg_addess); //Read a byte from single peripheral register
+int read_burst(uint8_t dev_address, uint8_t reg_address, size_t length, uint8_t *buffer); //Read a specified number of bytes from multiple adjaescent peripheral registers
 
 void setup() {
   Wire.begin(SDA, SCL); //Initialize I2C as controller
@@ -45,7 +45,7 @@ int write_byte(uint8_t dev_address, uint8_t reg_address, const uint8_t *data) {
 
 int read_byte(uint8_t dev_address, uint8_t reg_address) {
   
-  //Empty write to set peripheral's memory pointer to desired register
+  //Empty write to set peripheral's internal memory pointer to desired register
   Wire.beginTransmission(dev_address);
   Wire.write(reg_address);
   Wire.endTransmission();
@@ -59,6 +59,24 @@ int read_byte(uint8_t dev_address, uint8_t reg_address) {
   return -1; //Error check
 }
 
-int read_burst(uint8_t dev_address, uint8_t start_register_address, size_t length) {
+int read_burst(uint8_t dev_address, uint8_t reg_address, size_t length, uint8_t *buffer) {
+  
+  //Empty write to set peripheral's internal memory pointer to desired start register
+  Wire.beginTransmission(dev_address);
+  Wire.write(reg_address);
+  
+  //Check that Wire.endTransmission is successful i.e. returns 0
+  if (Wire.endTransmission() != 0) return -1; //Transmission error
 
+  size_t bytes_received = Wire.requestFrom(dev_address, length);
+  if(bytes_received != length) return -2; //Length mismatch error
+
+  //Loop through wire read 
+  for(size_t i = 0; i < length, i++){
+    if (Wire.available()){
+      buffer[i] = Wire.read();
+    }
+  }
+  
+  return 0; //Successful read
 }
