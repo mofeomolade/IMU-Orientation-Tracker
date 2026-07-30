@@ -8,9 +8,9 @@
 #define sensor_start_register 0x3B //ACCEL_XOUT_H register. All other ACCEL + GYRO registers follw immediately after
 
 // put function declarations here:
-int write_byte(uint8_t dev_address, uint8_t reg_address, const uint8_t *data, size_t length); //Write a single byte to peripheral register
+int write_byte(uint8_t dev_address, uint8_t reg_address, const uint8_t *data); //Write a single byte to peripheral register
 int write_burst(uint8_t dev_address, uint8_t reg_address, const uint8_t *data, size_t length); //Write a specified number of bytes to multiple adjaescent peripheral registers
-int read_byte(uint8_t dev_address, uint8_t reg_addess); //Read a byte from single peripheral register
+int read_byte(uint8_t dev_address, uint8_t reg_address, uint8_t *buffer); //Read a byte from single peripheral register
 int read_burst(uint8_t dev_address, uint8_t reg_address, size_t length, uint8_t *buffer); //Read a specified number of bytes from multiple adjaescent peripheral registers
 
 void setup() {
@@ -18,16 +18,15 @@ void setup() {
   Serial.begin(115200);
 
   uint8_t wake_cmd = 0X00;
-  write_byte(main_register, wake_register, &wake_cmd, 1); //Deactivate sleep mode by writing to PWR_MGMT_1 register
+  write_byte(main_register, wake_register, &wake_cmd); //Deactivate sleep mode by writing to PWR_MGMT_1 register
 }
 
 void loop() {
   
   uint8_t IMU_buffer[14];
   
-  if (read_burst(main_register, sensor_start_register, 14, IMU_buffer) == 0){
-    
-    for(size_t i = 0; i < 14; i++){
+  if (read_burst(main_register, sensor_start_register, 14, IMU_buffer) == 0) {
+    for(size_t i = 0; i < 14; i++) {
       Serial.println(IMU_buffer[i]);
     }
   }
@@ -37,7 +36,7 @@ void loop() {
 }
 
 // put function definitions here:
-int write_byte(uint8_t dev_address, uint8_t reg_address, const uint8_t *data, size_t length) {
+int write_burst(uint8_t dev_address, uint8_t reg_address, const uint8_t *data, size_t length) {
   Wire.beginTransmission(dev_address); //Initialize comms with the peripheral's main chip
   Wire.write(reg_address); //Tell the peripheral's chip which register to write to
 
@@ -55,20 +54,8 @@ int write_byte(uint8_t dev_address, uint8_t reg_address, const uint8_t *data, si
   */
 }
 
-int read_byte(uint8_t dev_address, uint8_t reg_address) {
-  
-  //Empty write to set peripheral's internal memory pointer to desired register
-  Wire.beginTransmission(dev_address);
-  Wire.write(reg_address);
-  Wire.endTransmission();
-
-  Wire.requestFrom(dev_address, 1); //Request byte from peripheral
-  
-  if (Wire.available()){
-  return(Wire.read()); //Pass the received byte back to main function
-  }
-
-  return -1; //Error check
+int write_byte(uint8_t dev_address, uint8_t reg_address, const uint8_t *data){
+  write_burst(dev_address, reg_address, data, 1);
 }
 
 int read_burst(uint8_t dev_address, uint8_t reg_address, size_t length, uint8_t *buffer) {
@@ -94,4 +81,8 @@ int read_burst(uint8_t dev_address, uint8_t reg_address, size_t length, uint8_t 
   }
 
   return 0; //Successful read
+}
+
+int read_byte(uint8_t dev_address, uint8_t reg_address, uint8_t *buffer) {
+  read_burst(dev_address, reg_address, 1, buffer);
 }
