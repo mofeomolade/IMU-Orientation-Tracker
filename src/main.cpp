@@ -31,8 +31,9 @@ void loop() {
       Serial.println(IMU_buffer[i]);
     }
   }
-
-  delay(5000); //Poll every 5 seconds
+  
+  Serial.println("-------------------------------------------")
+  delay(1000); //Poll every second
 }
 
 // put function definitions here:
