@@ -1,40 +1,35 @@
 #include <Arduino.h>
 #include <Wire.h>
 
-#define main_register 0x64 //MPU 6050 SIGNAL_PATH_RESET register
-#define wakeup_register 0x6B //PWR_MGMT_1 register
+#define SDA 6
+#define SCL 7
+#define main_register 0x68 //MPU 6050 SIGNAL_PATH_RESET register
+#define wake_register 0x6B //PWR_MGMT_1 register
 
 // put function declarations here:
-int write_register(uint8_t dev_address, uint8_t reg_address, const uint8_t *data, size_t length);
-int read_register_byte(uint8_t dev_address, uint8_t reg_address);
+int write_byte(uint8_t dev_address, uint8_t reg_address, const uint8_t *data); //Write a single byte to peripheral register
+int write_burst(uint8_t dev_address, uint8_t start_reg_address, const uint8_t *data[], size_t length); //Write a specified number of bytes to multiple adjaescent peripheral registers
+int read_byte(uint8_t dev_address, uint8_t reg_address); //Read a byte from single peripheral register
+int read_burst(uint8_t dev_address, uint8_t start_reg_address, size_t length); //Read a specified number of bytes from multiple adjaescent peripheral registers
 
 void setup() {
-  Wire.begin(6, 7); //Initialize I2C as controller (SDA, SCL)
+  Wire.begin(SDA, SCL); //Initialize I2C as controller
   Serial.begin(115200);
 
-  write_register(0x68, 0x6B, 0x00, 1); //Deactivate sleep mode by writing to PWR_MGMT_1 register
+  uint8_t wake_cmd = 0X00;
+  write_byter(main_register, wake_register, &wake_cmd); //Deactivate sleep mode by writing to PWR_MGMT_1 register
 }
 
 void loop() {
-  //PWR_MGMT_1 testing
 
-  int test_byte = read_register_byte(main_register, wakeup_register); //Check that chip wakeup worked
-  if(test_byte == 1){
-    Serial.println("Power on");
-  }
-  else{
-    Serial.println("Sleep mode");
-  }
-
-  delay(1000); //Poll once per second
 }
 
 // put function definitions here:
-int write_register(uint8_t dev_address, uint8_t reg_address, const uint8_t *data, size_t length) {
+int write_byte(uint8_t dev_address, uint8_t reg_address, const uint8_t *data) {
   Wire.beginTransmission(dev_address); //Initialize comms with the peripheral's main chip
   Wire.write(reg_address); //Tell the peripheral's chip which register to write to
 
-  Wire.write(data, length); //Send data array to the register
+  Wire.write(&data, length); //Send data array to the register
   return Wire.endTransmission(); //End transmission sequence
 
   /* 
@@ -48,7 +43,7 @@ int write_register(uint8_t dev_address, uint8_t reg_address, const uint8_t *data
   */
 }
 
-int read_register_byte(uint8_t dev_address, uint8_t reg_address) {
+int read_byte(uint8_t dev_address, uint8_t reg_address) {
   
   //Empty write to set peripheral's memory pointer to desired register
   Wire.beginTransmission(dev_address);
@@ -57,10 +52,13 @@ int read_register_byte(uint8_t dev_address, uint8_t reg_address) {
 
   Wire.requestFrom(dev_address, 1); //Request byte from peripheral
   
-  //Read bytes as long as they are available and there aren't more than the requested amount
   if (Wire.available()){
   return(Wire.read()); //Pass the received byte back to main function
   }
 
   return -1; //Error check
+}
+
+int read_burst(uint8_t dev_address, uint8_t start_register_address, size_t length) {
+
 }
