@@ -1,8 +1,8 @@
 #include <Arduino.h>
 #include <Wire.h>
 
-#define main_register 0x64 //MPU 6050 
-#define wakeup_register 0x6B //
+#define main_register 0x64 //MPU 6050 SIGNAL_PATH_RESET register
+#define wakeup_register 0x6B //PWR_MGMT_1 register
 
 // put function declarations here:
 int write_register(uint8_t dev_address, uint8_t reg_address, const uint8_t *data, size_t length);
@@ -16,10 +16,15 @@ void setup() {
 }
 
 void loop() {
-  //WHO_AM_I testing
+  //PWR_MGMT_1 testing
 
-  int test_byte = read_register_byte(104, 117); //Run helper function to access WHO_AM_I memory address
-  Serial.println(test_byte, HEX);
+  int test_byte = read_register_byte(main_register, wakeup_register); //Check that chip wakeup worked
+  if(test_byte == 1){
+    Serial.println("Power on");
+  }
+  else{
+    Serial.println("Sleep mode");
+  }
 
   delay(1000); //Poll once per second
 }
