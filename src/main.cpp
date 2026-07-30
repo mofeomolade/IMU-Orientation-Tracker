@@ -1,6 +1,9 @@
 #include <Arduino.h>
 #include <Wire.h>
 
+#define main_register 0x64 //MPU 6050 
+#define wakeup_register 0x6B //
+
 // put function declarations here:
 int write_register(uint8_t dev_address, uint8_t reg_address, const uint8_t *data, size_t length);
 int read_register_byte(uint8_t dev_address, uint8_t reg_address);
@@ -8,6 +11,8 @@ int read_register_byte(uint8_t dev_address, uint8_t reg_address);
 void setup() {
   Wire.begin(6, 7); //Initialize I2C as controller (SDA, SCL)
   Serial.begin(115200);
+
+  write_register(0x68, 0x6B, 0x00, 1); //Deactivate sleep mode by writing to PWR_MGMT_1 register
 }
 
 void loop() {
