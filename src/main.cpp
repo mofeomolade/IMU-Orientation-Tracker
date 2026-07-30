@@ -32,7 +32,7 @@ void loop() {
     }
   }
 
-
+  delay(5000); //Poll every 5 seconds
 }
 
 // put function definitions here:
