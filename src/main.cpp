@@ -3,9 +3,11 @@
 
 #define SDA 6
 #define SCL 7
-#define main_register 0x68 //MPU 6050 SIGNAL_PATH_RESET register
-#define wake_register 0x6B //PWR_MGMT_1 register
-#define sensor_start_register 0x3B //ACCEL_XOUT_H register. All other ACCEL + GYRO registers follw immediately after
+
+#define main_register 0x68 //MPU 6050 SIGNAL_PATH_RESET register address
+#define wake_register 0x6B //PWR_MGMT_1 register address
+#define accel_start_register 0x3B //ACCEL_XOUT_H register address
+#define gyro_start_register 0x43 //GYRO_XOUT_H register address
 
 // put function declarations here:
 int write_byte(uint8_t dev_address, uint8_t reg_address, const uint8_t *data); //Write a single byte to peripheral register
@@ -13,26 +15,25 @@ int write_burst(uint8_t dev_address, uint8_t reg_address, const uint8_t *data, s
 int read_byte(uint8_t dev_address, uint8_t reg_address, uint8_t *buffer); //Read a byte from single peripheral register
 int read_burst(uint8_t dev_address, uint8_t reg_address, size_t length, uint8_t *buffer); //Read a specified number of bytes from multiple adjaescent peripheral registers
 
+void process_IMU(struct IMU data);
+
 void setup() {
   Wire.begin(SDA, SCL); //Initialize I2C as controller
   Serial.begin(115200);
 
   uint8_t wake_cmd = 0X00;
   write_byte(main_register, wake_register, &wake_cmd); //Deactivate sleep mode by writing to PWR_MGMT_1 register
+
+  uint8_t IMU_buffer[14];
+  
+  struct IMU {
+    float accel_x, accel_y, accel_z; 
+    float gyro_x, gyro_y, gyro_z;
+  };
 }
 
 void loop() {
-  
-  uint8_t IMU_buffer[14];
-  
-  if (read_burst(main_register, sensor_start_register, 14, IMU_buffer) == 0) {
-    for(size_t i = 0; i < 14; i++) {
-      Serial.println(IMU_buffer[i]);
-    }
-  }
-  
-  Serial.println("-------------------------------------------");
-  delay(1000); //Poll every second
+
 }
 
 // put function definitions here:
@@ -55,7 +56,7 @@ int write_burst(uint8_t dev_address, uint8_t reg_address, const uint8_t *data, s
 }
 
 int write_byte(uint8_t dev_address, uint8_t reg_address, const uint8_t *data){
-  write_burst(dev_address, reg_address, data, 1);
+  return write_burst(dev_address, reg_address, data, 1);
 }
 
 int read_burst(uint8_t dev_address, uint8_t reg_address, size_t length, uint8_t *buffer) {
@@ -84,5 +85,6 @@ int read_burst(uint8_t dev_address, uint8_t reg_address, size_t length, uint8_t 
 }
 
 int read_byte(uint8_t dev_address, uint8_t reg_address, uint8_t *buffer) {
-  read_burst(dev_address, reg_address, 1, buffer);
+  return read_burst(dev_address, reg_address, 1, buffer);
 }
+
