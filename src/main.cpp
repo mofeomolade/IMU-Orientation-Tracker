@@ -14,6 +14,13 @@ struct IMU {
   float gyro_x, gyro_y, gyro_z;
 };
 
+struct Offset {
+  float sum_accel_x, sum_accel_y, sum_accel_z; 
+  float sum_gyro_x, sum_gyro_y, sum_gyro_z;
+};
+
+struct Offset test;
+
 // put function declarations here:
 int write_byte(uint8_t dev_address, uint8_t reg_address, const uint8_t *data); //Write a single byte to peripheral register
 int write_burst(uint8_t dev_address, uint8_t reg_address, const uint8_t *data, size_t length); //Write a specified number of bytes to multiple adjaescent peripheral registers
@@ -36,20 +43,7 @@ void loop() {
   
   if(read_burst(main_register, accel_start_register, 14, raw_buffer) == 0) {
     process_IMU(raw_buffer, &data);
-
-    Serial.println("Current Acceleration");
-    Serial.print("X: "); Serial.print(data.accel_x, 2);
-    Serial.print(" Y: "); Serial.print(data.accel_y, 2);
-    Serial.print(" Z: "); Serial.println(data.accel_z, 2);
-
-    Serial.println("Current Rotation");
-    Serial.println("--------------------");
-    Serial.print("X: "); Serial.print(data.gyro_x, 2);
-    Serial.print(" Y: "); Serial.print(data.gyro_y, 2);
-    Serial.print(" Z: "); Serial.println(data.gyro_z, 2);
   }
-
-  delay(1000);
 }
 
 // put function definitions here:
@@ -124,4 +118,12 @@ void process_IMU(uint8_t *raw_buffer, IMU *data) {
   data->gyro_x = raw_gyro_x/130.0;
   data->gyro_y = raw_gyro_y/130.0;
   data->gyro_z = raw_gyro_z/130.0;
+}
+
+void offset_test(uint8_t *raw_buffer, Offset *test, IMU *data){
+  process_IMU(raw_buffer, data);
+
+  test->sum_accel_x += data->accel_x;
+  test->sum_accel_y += data->accel_y;
+  test->sum_accel_z += data->accel_z - 1.0;
 }
