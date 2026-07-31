@@ -25,7 +25,7 @@ int write_burst(uint8_t dev_address, uint8_t reg_address, const uint8_t *data, s
 int read_byte(uint8_t dev_address, uint8_t reg_address, uint8_t *buffer); //Read a byte from single peripheral register
 int read_burst(uint8_t dev_address, uint8_t reg_address, size_t length, uint8_t *buffer); //Read a specified number of bytes from multiple adjaescent peripheral registers
 
-void process_IMU(uint8_t *buffer, IMU *data);
+void process_IMU(uint8_t *buffer, IMU &data);
 
 void offset_test(Offset &calibration);
 
@@ -108,7 +108,7 @@ int read_byte(uint8_t dev_address, uint8_t reg_address, uint8_t *buffer) {
   return read_burst(dev_address, reg_address, 1, buffer); //Call read_burst length 1
 }
 
-void process_IMU(uint8_t *raw_buffer, IMU *data) {
+void process_IMU(uint8_t *raw_buffer, IMU &data) {
   //Combine paired 8-bit accelerometer register readings from Big-Endian to 16-bit
   int16_t raw_accel_x = (int16_t)raw_buffer[0] << 8 | raw_buffer[1];
   int16_t raw_accel_y = (int16_t)raw_buffer[2] << 8 | raw_buffer[3];
@@ -120,14 +120,14 @@ void process_IMU(uint8_t *raw_buffer, IMU *data) {
   int16_t raw_gyro_z = (int16_t)raw_buffer[12] << 8 | raw_buffer[13];
 
   //Convert accelerometer readings to acceleration value G-force
-  data->accel_x = raw_accel_x/16384.0;
-  data->accel_y = raw_accel_y/16384.0;
-  data->accel_z = raw_accel_z/16384.0;
+  data.accel_x = raw_accel_x/16384.0;
+  data.accel_y = raw_accel_y/16384.0;
+  data.accel_z = raw_accel_z/16384.0;
 
   //Convert gyroscope readings to angular velocity value in degrees/second
-  data->gyro_x = raw_gyro_x/130.0;
-  data->gyro_y = raw_gyro_y/130.0;
-  data->gyro_z = raw_gyro_z/130.0;
+  data.gyro_x = raw_gyro_x/130.0;
+  data.gyro_y = raw_gyro_y/130.0;
+  data.gyro_z = raw_gyro_z/130.0;
 }
 
 void offset_test(Offset &calibration){
@@ -143,7 +143,7 @@ void offset_test(Offset &calibration){
   //Loop 1000x to get a reasoble offset average
   for(int i = 0; i < 1000; i++){
     if(read_burst(main_register, accel_start_register, 14, offset_buffer) == 0) {
-      process_IMU(offset_buffer, &offset_data); //Call process_IMU
+      process_IMU(offset_buffer, offset_data); //Call process_IMU
 
       //Track the total accelerometer offset across 1000 runs
       sum_accel_x += offset_data.accel_x;
