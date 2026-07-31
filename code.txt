@@ -19,6 +19,8 @@ struct Offset {
   float offset_gyro_x, offset_gyro_y, offset_gyro_z;
 };
 
+struct Offset test;
+
 // put function declarations here:
 int write_byte(uint8_t dev_address, uint8_t reg_address, const uint8_t *data); //Write a single byte to peripheral register
 int write_burst(uint8_t dev_address, uint8_t reg_address, const uint8_t *data, size_t length); //Write a specified number of bytes to multiple adjaescent peripheral registers
@@ -27,7 +29,7 @@ int read_burst(uint8_t dev_address, uint8_t reg_address, size_t length, uint8_t 
 
 void process_IMU(uint8_t *buffer, IMU *data);
 
-void offset_test(Offset &calibration);
+int offset_test(uint8_t *raw_buffer, Offset *test, IMU *data, int test_index);
 
 void setup() {
   Wire.begin(SDA, SCL); //Initialize I2C as controller
@@ -38,22 +40,27 @@ void setup() {
 }
 
 void loop() {
-  //Simple serial print test to check if calibration function is working
+  static int test_index = 0;
+  uint8_t raw_buffer[14];
+  struct IMU data; 
   
-  struct Offset calibration;
-  offset_test(calibration);
+  if(read_burst(main_register, accel_start_register, 14, raw_buffer) == 0) {
+    if(offset_test(raw_buffer, &test, &data, test_index) == 0) {
+    
+      Serial.println("Acceleration Offset");
+      Serial.print("X: "); Serial.print(test.offset_accel_x, 2);
+      Serial.print(" Y: "); Serial.print(test.offset_accel_y, 2);
+      Serial.print(" Z: "); Serial.println(test.offset_accel_z, 2);
 
-  Serial.println("Acceleration Offset");
-  Serial.print("X: "); Serial.print(calibration.offset_accel_x, 2);
-  Serial.print(" Y: "); Serial.print(calibration.offset_accel_y, 2);
-  Serial.print(" Z: "); Serial.println(calibration.offset_accel_z, 2);
+      Serial.println("Rotation Offset");
+      Serial.println("--------------------");
+      Serial.print("X: "); Serial.print(test.offset_gyro_x, 2);
+      Serial.print(" Y: "); Serial.print(test.offset_gyro_y, 2);
+      Serial.print(" Z: "); Serial.println(test.offset_gyro_z, 2);
+      }
+  }
 
-  Serial.println("Rotation Offset");
-  Serial.println("--------------------");
-  Serial.print("X: "); Serial.print(calibration.offset_gyro_x, 2);
-  Serial.print(" Y: "); Serial.print(calibration.offset_gyro_y, 2);
-  Serial.print(" Z: "); Serial.println(calibration.offset_gyro_z, 2);
-
+  delay(5000);
 }
 
 // put function definitions here:
@@ -130,42 +137,34 @@ void process_IMU(uint8_t *raw_buffer, IMU *data) {
   data->gyro_z = raw_gyro_z/130.0;
 }
 
-void offset_test(Offset &calibration){
-  //Set up parametrs for process_IMU function
-  struct IMU offset_data;
-  uint8_t offset_buffer[14];
+int offset_test(uint8_t *raw_buffer, Offset *test, IMU *data, int test_index){
+  process_IMU(raw_buffer, data); //Call process_IMU
 
-  //Set up variables to hold the total offsets for a calibration test
-  float sum_accel_x = 0, sum_accel_y = 0, sum_accel_z = 0;
-  float sum_gyro_x = 0, sum_gyro_y = 0, sum_gyro_z = 0; 
-  float sample_size = 1000; 
+  float sum_accel_x, sum_accel_y, sum_accel_z = 0;
+  float sum_gyro_x, sum_gyro_y, sum_gyro_z = 0; 
 
-  //Loop 1000x to get a reasoble offset average
-  for(int i = 0; i < 1000; i++){
-    if(read_burst(main_register, accel_start_register, 14, offset_buffer) == 0) {
-      process_IMU(offset_buffer, &offset_data); //Call process_IMU
+  //Track the total accelerometer offset across multiple loops
+  sum_accel_x += data->accel_x;
+  sum_accel_y += data->accel_y;
+  sum_accel_z += data->accel_z - 1.0;
+  
+  //Track the total gyroscope offset across multiple loops
+  sum_gyro_x += data->accel_x;
+  sum_gyro_y += data->accel_y;
+  sum_gyro_z += data->accel_z - 1.0;
+ 
+  //Track how many runs
+  test_index++;
+  
+  if(test_index == 999){
+    test->offset_accel_x = sum_accel_x/1000.0;
+    test->offset_accel_y = sum_accel_y/1000.0;
+    test->offset_accel_z = sum_accel_z/1000.0;
 
-      //Track the total accelerometer offset across 1000 runs
-      sum_accel_x += offset_data.accel_x;
-      sum_accel_y += offset_data.accel_y;
-      sum_accel_z += offset_data.accel_z - 1.0;
-      
-      //Track the total gyroscope offset across 1000 rus
-      sum_gyro_x += offset_data.gyro_x;
-      sum_gyro_y += offset_data.gyro_y;
-      sum_gyro_z += offset_data.gyro_z;
+    test->offset_gyro_x = sum_gyro_x/1000.0;
+    test->offset_gyro_y = sum_gyro_y/1000.0;
+    test->offset_gyro_z = sum_gyro_z/1000.0;
 
-      delay(2); //500Hz polling
-    }
+    return 0; //Successful offset calculation
   }
-
-  //Take the accelerometer drift avg over all runs
-  calibration.offset_accel_x = sum_accel_x/sample_size;
-  calibration.offset_accel_y = sum_accel_y/sample_size;
-  calibration.offset_accel_z = sum_accel_z/sample_size;
-
-  //Take the gyroscope drift average over all runs
-  calibration.offset_gyro_x = sum_gyro_x/sample_size;
-  calibration.offset_gyro_y = sum_gyro_y/sample_size;
-  calibration.offset_gyro_z = sum_gyro_z/sample_size;
 }
