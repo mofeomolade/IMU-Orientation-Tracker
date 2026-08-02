@@ -58,7 +58,7 @@ void setup() {
     correct_IMU(imu, offset);
 
     //Initial orientation calculation so starting position reflects actual orientation
-    attitude.pitch = atan2(-imu.accel_x, sqrt( pow(imu.accel_y, 2) + pow(imu.accel_z, 2) )) * RAD_TO_DEGREES;
+    attitude.pitch = atan2(-imu.accel_x, sqrt( imu.accel_y * imu.accel_y+ imu.accel_z * imu.accel_z)) * RAD_TO_DEGREES;
     attitude.roll = atan2(imu.accel_y, imu.accel_z) * RAD_TO_DEGREES;
     attitude.yaw = 0.0; //Yaw set to zero with respect to initial position
   }
@@ -78,8 +78,7 @@ void loop() {
     filter_IMU(imu, attitude, dt);
 
     if(millis() - last_print_time > 500){
-      //Python communication over serial
-      //Format: "pitch, roll, yaw\n"
+      //Display pitch, roll and yaw to serial monitor
       Serial.print("Pitch: ");
       Serial.print(attitude.pitch);
       Serial.print(",");
@@ -229,7 +228,7 @@ void filter_IMU (IMU &data, Attitude &orientation, float dt){
   const float alpha = 0.96; //96% weight in gyro reading, 4% weight in accelerometer reading
 
   //Use trig to calculate pitch and roll based on accelerometer readings
-  float accel_pitch = atan2(-data.accel_x, sqrt( pow(data.accel_y, 2) + pow(data.accel_z, 2) )) * RAD_TO_DEGREES;
+  float accel_pitch = atan2(-data.accel_x, sqrt( data.accel_y * data.accel_y + data.accel_z * data.accel_z )) * RAD_TO_DEGREES;
   float accel_roll = atan2(data.accel_y, data.accel_z) * RAD_TO_DEGREES;
 
   //Combine accelerometer trig calculations with raw gyroscope readings
