@@ -22,9 +22,9 @@ struct Offset {
 };
 
 struct Attitude{
-  float pitch = 0;
-  float roll = 0;
-  float yaw = 0; 
+  float pitch;
+  float roll;
+  float yaw; 
 };
 
 // put function declarations here:
@@ -42,6 +42,7 @@ struct Offset offset; //Global Offset struct to hold stationary IMU drift values
 struct Attitude attitude; //Global Attitude struct to hold position angles
 
 unsigned long last_time = micros();
+unsigned long last_print_time = millis();
 
 void setup() {
   Wire.begin(SDA, SCL); //Initialize I2C as controller
@@ -51,12 +52,17 @@ void setup() {
   write_byte(main_register, wake_register, &wake_cmd); //Deactivate sleep mode by writing to PWR_MGMT_1 register
 
   offset_test(imu, offset); //Run initial baseline offset test and store
+
+  //Initial orientation calculation so starting position reflects actual orientation
+  attitude.pitch = atan2(-imu.accel_x, sqrt( pow(imu.accel_y, 2) + pow(imu.accel_z, 2) )) * RAD_TO_DEGREES;
+  attitude.roll = atan2(imu.accel_y, imu.accel_z) * RAD_TO_DEGREES;
+  attitude.yaw = 0.0; //Yaw set to zero with respect to initial position
 }
 
 void loop() {
   //Calculate dt in seconds using last_time and current_time
   unsigned long current_time = micros();
-  float dt = (current_time - last_time) * pow(10, 9);
+  float dt = (current_time - last_time) / 1000000.0;
   last_time = current_time;
 
   if(read_IMU (imu) == 0){
@@ -66,13 +72,20 @@ void loop() {
     //Apply complementary filter to IMU readinds and pass to attitude struct
     filter_IMU(imu, attitude, dt);
 
-    //Python communication over serial
-    //Format: "pitch, roll, yaw\n"
-    Serial.print(attitude.pitch);
-    Serial.print(",");
-    Serial.print(attitude.roll);
-    Serial.print(",");
-    Serial.println(attitude.yaw);
+    if(millis() - last_print_time > 1000){
+      //Python communication over serial
+      //Format: "pitch, roll, yaw\n"
+      Serial.print("Pitch: ");
+      Serial.print(attitude.pitch);
+      Serial.print(",");
+      Serial.print(" Roll: ");
+      Serial.print(attitude.roll);
+      Serial.print(",");
+      Serial.print(" Yaw: ");
+      Serial.println(attitude.yaw);
+
+      last_print_time = millis();
+    }
   }
 }
 
@@ -139,9 +152,9 @@ int read_IMU(IMU &data) {
     int16_t raw_accel_z = ((int16_t)raw_buffer[4] << 8) | raw_buffer[5];
 
     //Combine paired 8-bit gyroscope register readings from Big-Endian to 16-bit
-    int16_t raw_gyro_x = (int16_t)raw_buffer[8] << 8 | raw_buffer[9];
-    int16_t raw_gyro_y = (int16_t)raw_buffer[10] << 8 | raw_buffer[11];
-    int16_t raw_gyro_z = (int16_t)raw_buffer[12] << 8 | raw_buffer[13];
+    int16_t raw_gyro_x = ((int16_t)raw_buffer[8] << 8)  | raw_buffer[9];
+    int16_t raw_gyro_y = ((int16_t)raw_buffer[10] << 8) | raw_buffer[11];
+    int16_t raw_gyro_z = ((int16_t)raw_buffer[12] << 8) | raw_buffer[13];
 
     //Convert accelerometer readings to acceleration value G-force
     data.accel_x = raw_accel_x/16384.0;
@@ -194,17 +207,14 @@ void offset_test(IMU &data, Offset &calibration){
 }
 
 void correct_IMU (IMU &data, Offset &calibration){
-  //Initialize variables to hold IMU readings after at-rest offset values are applied
-  float corrected_accel_x, corrected_accel_y, corrected_accel_z;
-  float corrected_gyro_x, corrected_gyro_y, corrected_gyro_z;
+  //Subtract offsets from IMU readings
+  data.accel_x - calibration.offset_accel_x;
+  data.accel_y - calibration.offset_accel_y;
+  data.accel_z - calibration.offset_accel_z;
 
-  corrected_accel_x = data.accel_x - calibration.offset_accel_x;
-  corrected_accel_y = data.accel_y - calibration.offset_accel_y;
-  corrected_accel_z = data.accel_z - calibration.offset_accel_z;
-
-  corrected_gyro_x = data.gyro_x - calibration.offset_gyro_x;
-  corrected_gyro_y = data.gyro_y - calibration.offset_gyro_y;
-  corrected_gyro_z = data.gyro_z - calibration.offset_gyro_z;
+  data.gyro_x -= calibration.offset_gyro_x;
+  data.gyro_y -= calibration.offset_gyro_y;
+  data.gyro_z -= calibration.offset_gyro_z;
 }
 
 void filter_IMU (IMU &data, Attitude &orientation, float dt){
@@ -217,9 +227,9 @@ void filter_IMU (IMU &data, Attitude &orientation, float dt){
   float accel_roll = atan2(data.accel_y, data.accel_z) * RAD_TO_DEGREES;
 
   //Combine accelerometer trig calculations with raw gyroscope readings
-  attitude.pitch = alpha * (attitude.pitch + data.gyro_y *dt) + (1.0 - alpha) * accel_pitch;
-  attitude.roll = alpha * (attitude.roll + data.gyro_z *dt) + (1.0 - alpha) * accel_roll;
+  orientation.pitch = alpha * (orientation.pitch + data.gyro_y *dt) + (1.0 - alpha) * accel_pitch;
+  orientation.roll = alpha * (orientation.roll + data.gyro_x *dt) + (1.0 - alpha) * accel_roll;
 
   //Yaw bases only on gyro because rotation about z-axis doesn't affect accelerometer reading
-  attitude.yaw += data.gyro_z * dt;
+  orientation.yaw += data.gyro_z * dt;
 }
