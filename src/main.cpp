@@ -53,10 +53,15 @@ void setup() {
 
   offset_test(imu, offset); //Run initial baseline offset test and store
 
-  //Initial orientation calculation so starting position reflects actual orientation
-  attitude.pitch = atan2(-imu.accel_x, sqrt( pow(imu.accel_y, 2) + pow(imu.accel_z, 2) )) * RAD_TO_DEGREES;
-  attitude.roll = atan2(imu.accel_y, imu.accel_z) * RAD_TO_DEGREES;
-  attitude.yaw = 0.0; //Yaw set to zero with respect to initial position
+  //Seeding for accurate readings in main loop()
+  if(read_IMU(imu) == 0){
+    correct_IMU(imu, offset);
+
+    //Initial orientation calculation so starting position reflects actual orientation
+    attitude.pitch = atan2(-imu.accel_x, sqrt( pow(imu.accel_y, 2) + pow(imu.accel_z, 2) )) * RAD_TO_DEGREES;
+    attitude.roll = atan2(imu.accel_y, imu.accel_z) * RAD_TO_DEGREES;
+    attitude.yaw = 0.0; //Yaw set to zero with respect to initial position
+  }
 }
 
 void loop() {
@@ -72,7 +77,7 @@ void loop() {
     //Apply complementary filter to IMU readinds and pass to attitude struct
     filter_IMU(imu, attitude, dt);
 
-    if(millis() - last_print_time > 1000){
+    if(millis() - last_print_time > 500){
       //Python communication over serial
       //Format: "pitch, roll, yaw\n"
       Serial.print("Pitch: ");
@@ -83,6 +88,7 @@ void loop() {
       Serial.print(",");
       Serial.print(" Yaw: ");
       Serial.println(attitude.yaw);
+      Serial.println();
 
       last_print_time = millis();
     }
@@ -208,9 +214,9 @@ void offset_test(IMU &data, Offset &calibration){
 
 void correct_IMU (IMU &data, Offset &calibration){
   //Subtract offsets from IMU readings
-  data.accel_x - calibration.offset_accel_x;
-  data.accel_y - calibration.offset_accel_y;
-  data.accel_z - calibration.offset_accel_z;
+  data.accel_x -= calibration.offset_accel_x;
+  data.accel_y -= calibration.offset_accel_y;
+  data.accel_z -= calibration.offset_accel_z;
 
   data.gyro_x -= calibration.offset_gyro_x;
   data.gyro_y -= calibration.offset_gyro_y;
