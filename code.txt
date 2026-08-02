@@ -37,7 +37,7 @@ void setup() {
   write_byte(main_register, wake_register, &wake_cmd); //Deactivate sleep mode by writing to PWR_MGMT_1 register
 
   struct Offset calibration;
-  offest_test(calbration);
+  offset_test(calbration);
 }
 
 void loop() {
@@ -99,8 +99,8 @@ int read_byte(uint8_t dev_address, uint8_t reg_address, uint8_t *buffer) {
 void process_IMU(uint8_t *raw_buffer, IMU &data) {
   //Combine paired 8-bit accelerometer register readings from Big-Endian to 16-bit
   int16_t raw_accel_x = ((int16_t)raw_buffer[0] << 8) | raw_buffer[1];
-  int16_t raw_accel_y = ((int16_t)raw_buffer[2] << 8) | raw_buffer[3];
-  int16_t raw_accel_z = ((int16_t)raw_buffer[4] << 8) | raw_buffer[5];
+  int16_t raw_accel_y = (int16_t)raw_buffer[2] << 8) | raw_buffer[3];
+  int16_t raw_accel_z = (int16_t)raw_buffer[4] << 8 | raw_buffer[5];
 
   //Combine paired 8-bit gyroscope register readings from Big-Endian to 16-bit
   int16_t raw_gyro_x = (int16_t)raw_buffer[8] << 8 | raw_buffer[9];
@@ -113,9 +113,9 @@ void process_IMU(uint8_t *raw_buffer, IMU &data) {
   data.accel_z = raw_accel_z/16384.0;
 
   //Convert gyroscope readings to angular velocity value in degrees/second
-  data.gyro_x = raw_gyro_x/131.0;
-  data.gyro_y = raw_gyro_y/131.0;
-  data.gyro_z = raw_gyro_z/131.0;
+  data.gyro_x = raw_gyro_x/130.0;
+  data.gyro_y = raw_gyro_y/130.0;
+  data.gyro_z = raw_gyro_z/130.0;
 }
 
 void offset_test(Offset &calibration){
