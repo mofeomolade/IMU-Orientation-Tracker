@@ -9,6 +9,8 @@
 #define accel_start_register 0x3B //ACCEL_XOUT_H register address
 #define gyro_start_register 0x43 //GYRO_XOUT_H register address
 
+#define RAD_TO_DEGREES 180.0/PI
+
 struct IMU {
   float accel_x, accel_y, accel_z; 
   float gyro_x, gyro_y, gyro_z;
@@ -30,13 +32,16 @@ int write_byte(uint8_t dev_address, uint8_t reg_address, const uint8_t *data); /
 int write_burst(uint8_t dev_address, uint8_t reg_address, const uint8_t *data, size_t length); //Write a specified number of bytes to multiple adjaescent peripheral registers
 int read_byte(uint8_t dev_address, uint8_t reg_address, uint8_t *buffer); //Read a byte from single peripheral register
 int read_burst(uint8_t dev_address, uint8_t reg_address, size_t length, uint8_t *buffer); //Read a specified number of bytes from multiple adjaescent peripheral registers
-void read_IMU(IMU &data);
-void offset_test(Offset &calibration, IMU &data);
-void complementary_filter (IMU &data, Attitude &orientation);
+int read_IMU(IMU &data);
+void offset_test(IMU &data, Offset &calibration);
+void correct_IMU (IMU &data, Offset &calibration);
+void filter_IMU (IMU &data, Attitude &orientation, float dt);
 
 struct IMU imu; //Global IMU struct to be used in all processing after calibration
 struct Offset offset; //Global Offset struct to hold stationary IMU drift values
-struct Attitude attitude; //Global Attitude 
+struct Attitude attitude; //Global Attitude struct to hold position angles
+
+unsigned long last_time = micros();
 
 void setup() {
   Wire.begin(SDA, SCL); //Initialize I2C as controller
@@ -45,11 +50,30 @@ void setup() {
   uint8_t wake_cmd = 0X00;
   write_byte(main_register, wake_register, &wake_cmd); //Deactivate sleep mode by writing to PWR_MGMT_1 register
 
-  offset_test(offset, imu); //Run initial baseline offset test and store
+  offset_test(imu, offset); //Run initial baseline offset test and store
 }
 
 void loop() {
+  //Calculate dt in seconds using last_time and current_time
+  unsigned long current_time = micros();
+  float dt = (current_time - last_time) * pow(10, 9);
+  last_time = current_time;
 
+  if(read_IMU (imu) == 0){
+    //Apply offset to IMU readings
+    correct_IMU(imu, offset);
+
+    //Apply complementary filter to IMU readinds and pass to attitude struct
+    filter_IMU(imu, attitude, dt);
+
+    //Python communication over serial
+    //Format: "pitch, roll, yaw\n"
+    Serial.print(attitude.pitch);
+    Serial.print(",");
+    Serial.print(attitude.roll);
+    Serial.print(",");
+    Serial.println(attitude.yaw);
+  }
 }
 
 // put function definitions here:
@@ -104,7 +128,7 @@ int read_byte(uint8_t dev_address, uint8_t reg_address, uint8_t *buffer) {
   return read_burst(dev_address, reg_address, 1, buffer); //Call read_burst length 1
 }
 
-void read_IMU(IMU &data) {
+int read_IMU(IMU &data) {
   uint8_t raw_buffer[14]; //Buffer to hold all accelerometer and gyroscope data
   
   //Check that the read
@@ -128,10 +152,13 @@ void read_IMU(IMU &data) {
     data.gyro_x = raw_gyro_x/131.0;
     data.gyro_y = raw_gyro_y/131.0;
     data.gyro_z = raw_gyro_z/131.0;
+
+    return 0; //Successful IMU reading
   }
+  return -1;
 }
 
-void offset_test(Offset &calibration, IMU &offset_data){
+void offset_test(IMU &data, Offset &calibration){
 
   //Set up variables to hold the total offsets for a calibration test
   float sum_accel_x = 0, sum_accel_y = 0, sum_accel_z = 0;
@@ -140,17 +167,17 @@ void offset_test(Offset &calibration, IMU &offset_data){
 
   //Loop 1000x to get a reasoble offset average
   for(int i = 0; i < 1000; i++){
-    read_IMU(offset_data); //Call read_IMU
+    read_IMU(data); //Call read_IMU
 
     //Track the total accelerometer offset across 1000 runs
-    sum_accel_x += offset_data.accel_x;
-    sum_accel_y += offset_data.accel_y;
-    sum_accel_z += offset_data.accel_z - 1.0;
+    sum_accel_x += data.accel_x;
+    sum_accel_y += data.accel_y;
+    sum_accel_z += data.accel_z - 1.0;
     
     //Track the total gyroscope offset across 1000 rus
-    sum_gyro_x += offset_data.gyro_x;
-    sum_gyro_y += offset_data.gyro_y;
-    sum_gyro_z += offset_data.gyro_z;
+    sum_gyro_x += data.gyro_x;
+    sum_gyro_y += data.gyro_y;
+    sum_gyro_z += data.gyro_z;
 
     delay(2); //500Hz polling
   }
@@ -166,7 +193,7 @@ void offset_test(Offset &calibration, IMU &offset_data){
   calibration.offset_gyro_z = sum_gyro_z/sample_size;
 }
 
-void correct_IMU (Offset &calibration, IMU &data){
+void correct_IMU (IMU &data, Offset &calibration){
   //Initialize variables to hold IMU readings after at-rest offset values are applied
   float corrected_accel_x, corrected_accel_y, corrected_accel_z;
   float corrected_gyro_x, corrected_gyro_y, corrected_gyro_z;
@@ -180,4 +207,19 @@ void correct_IMU (Offset &calibration, IMU &data){
   corrected_gyro_z = data.gyro_z - calibration.offset_gyro_z;
 }
 
-void complementary_filter (IMU &data, Attitude &orientation);
+void filter_IMU (IMU &data, Attitude &orientation, float dt){
+  //Complementary filter function: Angle(t) = alpha * [Angle(t-1) + Gyro_angle * delta_t] + (1 - alpha) * Accelerometer_angle
+  
+  const float alpha = 0.96; //96% weight in gyro reading, 4% weight in accelerometer reading
+
+  //Use trig to calculate pitch and roll based on accelerometer readings
+  float accel_pitch = atan2(-data.accel_x, sqrt( pow(data.accel_y, 2) + pow(data.accel_z, 2) )) * RAD_TO_DEGREES;
+  float accel_roll = atan2(data.accel_y, data.accel_z) * RAD_TO_DEGREES;
+
+  //Combine accelerometer trig calculations with raw gyroscope readings
+  attitude.pitch = alpha * (attitude.pitch + data.gyro_y *dt) + (1.0 - alpha) * accel_pitch;
+  attitude.roll = alpha * (attitude.roll + data.gyro_z *dt) + (1.0 - alpha) * accel_roll;
+
+  //Yaw bases only on gyro because rotation about z-axis doesn't affect accelerometer reading
+  attitude.yaw += data.gyro_z * dt;
+}
