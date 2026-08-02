@@ -77,7 +77,7 @@ void loop() {
     //Apply complementary filter to IMU readinds and pass to attitude struct
     filter_IMU(imu, attitude, dt);
 
-    if(millis() - last_print_time > 500){
+    if(millis() - last_print_time > 350){
       //Display pitch, roll and yaw to serial monitor
       Serial.print("Pitch: ");
       Serial.print(attitude.pitch);
@@ -220,6 +220,12 @@ void correct_IMU (IMU &data, Offset &calibration){
   data.gyro_x -= calibration.offset_gyro_x;
   data.gyro_y -= calibration.offset_gyro_y;
   data.gyro_z -= calibration.offset_gyro_z;
+
+  //Deadband filter
+  //Angular acceleration must have large enough magnitude to filter out gyroscope noise 
+  if (abs(data.gyro_x) < 0.05) data.gyro_x = 0.0;
+  if (abs(data.gyro_y) < 0.05) data.gyro_y = 0.0;
+  if (abs(data.gyro_z) < 0.05) data.gyro_z = 0.0;
 }
 
 void filter_IMU (IMU &data, Attitude &orientation, float dt){
