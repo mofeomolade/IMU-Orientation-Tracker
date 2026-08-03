@@ -61,6 +61,8 @@ void setup() {
     attitude.pitch = atan2(-imu.accel_x, sqrt( imu.accel_y * imu.accel_y+ imu.accel_z * imu.accel_z)) * RAD_TO_DEGREES;
     attitude.roll = atan2(imu.accel_y, imu.accel_z) * RAD_TO_DEGREES;
     attitude.yaw = 0.0; //Yaw set to zero with respect to initial position
+
+    last_time = micros();
   }
 }
 
@@ -196,8 +198,6 @@ void offset_test(IMU &data, Offset &calibration){
     sum_gyro_x += data.gyro_x;
     sum_gyro_y += data.gyro_y;
     sum_gyro_z += data.gyro_z;
-
-    delay(2); //500Hz polling
   }
 
   //Take the accelerometer drift avg over all runs
