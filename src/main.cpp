@@ -10,6 +10,7 @@
 #define gyro_start_register 0x43 //GYRO_XOUT_H register address
 
 #define RAD_TO_DEGREES 180.0/PI
+#define GYRO_DEADBAND 0.05
 
 struct IMU {
   float accel_x, accel_y, accel_z; 
@@ -223,9 +224,9 @@ void correct_IMU (IMU &data, Offset &calibration){
 
   //Deadband filter
   //Angular acceleration must have large enough magnitude to filter out gyroscope noise 
-  if (abs(data.gyro_x) < 0.05) data.gyro_x = 0.0;
-  if (abs(data.gyro_y) < 0.05) data.gyro_y = 0.0;
-  if (abs(data.gyro_z) < 0.05) data.gyro_z = 0.0;
+  if (abs(data.gyro_x) < GYRO_DEADBAND) data.gyro_x = 0.0;
+  if (abs(data.gyro_y) < GYRO_DEADBAND) data.gyro_y = 0.0;
+  if (abs(data.gyro_z) < GYRO_DEADBAND) data.gyro_z = 0.0;
 }
 
 void filter_IMU (IMU &data, Attitude &orientation, float dt){
