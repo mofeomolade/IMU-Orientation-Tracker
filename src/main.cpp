@@ -10,7 +10,7 @@
 #define gyro_start_register 0x43 //GYRO_XOUT_H register address
 
 #define RAD_TO_DEGREES 180.0/PI
-#define GYRO_DEADBAND 0.2
+#define GYRO_DEADBAND 0.3
 
 struct IMU {
   float accel_x, accel_y, accel_z; 
@@ -45,8 +45,6 @@ struct Attitude attitude; //Global Attitude struct to hold position angles
 unsigned long last_time = micros();
 unsigned long last_print_time = millis();
 
-uint32_t count = 0;
-
 void setup() {
   Wire.begin(SDA, SCL); //Initialize I2C as controller
   Serial.begin(115200);
@@ -76,7 +74,6 @@ void loop() {
   last_time = current_time;
 
   if(read_IMU (imu) == 0){
-    count++;
     //Apply offset to IMU readings
     correct_IMU(imu, offset);
 
