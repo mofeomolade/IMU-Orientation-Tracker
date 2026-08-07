@@ -50,7 +50,7 @@ void setup() {
   Wire.begin(SDA, SCL); //Initialize I2C as controller
   Serial.begin(115200);
 
-  write_byte(main_register, wake_register, &wake_cmd); //Deactivate sleep mode by writing to PWR_MGMT_1 register
+  write_byte(main_register, wake_register, wake_cmd); //Deactivate sleep mode by writing to PWR_MGMT_1 register
 
   offset_test(imu, offset); //Run initial baseline offset test and store
 
