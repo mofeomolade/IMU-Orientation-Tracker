@@ -8,6 +8,7 @@
 #define wake_register 0x6B //PWR_MGMT_1 register address
 #define accel_start_register 0x3B //ACCEL_XOUT_H register address
 #define gyro_start_register 0x43 //GYRO_XOUT_H register address
+#define wake_cmd 0X00
 
 #define RAD_TO_DEGREES 180.0/PI
 #define GYRO_DEADBAND 0.3
@@ -43,13 +44,12 @@ struct Offset offset; //Global Offset struct to hold stationary IMU drift values
 struct Attitude attitude; //Global Attitude struct to hold position angles
 
 unsigned long last_time = micros();
-unsigned long last_print_time = millis();
+unsigned long last_print = millis();
 
 void setup() {
   Wire.begin(SDA, SCL); //Initialize I2C as controller
   Serial.begin(115200);
 
-  uint8_t wake_cmd = 0X00;
   write_byte(main_register, wake_register, &wake_cmd); //Deactivate sleep mode by writing to PWR_MGMT_1 register
 
   offset_test(imu, offset); //Run initial baseline offset test and store
@@ -80,7 +80,7 @@ void loop() {
     //Apply complementary filter to IMU readinds and pass to attitude struct
     filter_IMU(imu, attitude, dt);
 
-    if(millis() - last_print_time > 350){
+    if(millis() - last_print > 350){
       //Display pitch, roll and yaw to serial monitor
       Serial.print("Pitch: ");
       Serial.print(attitude.pitch);
@@ -92,7 +92,7 @@ void loop() {
       Serial.println(attitude.yaw);
       Serial.println();
 
-      last_print_time = millis();
+      last_print = millis();
     }
   }
 }
