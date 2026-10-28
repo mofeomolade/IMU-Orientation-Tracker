@@ -80,20 +80,12 @@ void loop() {
     //Apply complementary filter to IMU readinds and pass to attitude struct
     filter_IMU(imu, attitude, dt);
 
-    if(millis() - last_print > 350){
-      //Display pitch, roll and yaw to serial monitor
-      Serial.print("Pitch: ");
-      Serial.print(attitude.pitch);
+      //Send a continuous stream of comma separated data to a python script
+      Serial.print(pitch);
       Serial.print(",");
-      Serial.print(" Roll: ");
-      Serial.print(attitude.roll);
+      Serial.print(roll);
       Serial.print(",");
-      Serial.print(" Yaw: ");
-      Serial.println(attitude.yaw);
-      Serial.println();
-
-      last_print = millis();
-    }
+      Serial.println(yaw);
   }
 }
 
